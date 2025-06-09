@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智元粒子宇宙：维度跃迁体验</title>
+  <meta name="description" content="基于Three.js的高性能交互式3D粒子系统，体验跨维度的数字宇宙">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #000;
+      color: #fff;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+    }
+
+    /* 重新设计的UI控制面板 - 完全隐藏式设计 */
+    .ui-panel {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(150px);
+      z-index: 50;
+      background: rgba(15, 15, 25, 0.85);
+      backdrop-filter: blur(15px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      padding: 24px;
+      min-width: 320px;
+      max-width: 90vw;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.3),
+        0 0 60px rgba(0, 255, 255, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .ui-panel.active {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .ui-panel h2 {
+      font-size: 16px;
+      font-weight: 300;
+      margin-bottom: 20px;
+      color: rgba(255, 255, 255, 0.9);
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
+
+    /* 横向网格布局 */
+    .morph-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .morph-btn {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 16px 12px;
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 13px;
+      font-weight: 400;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 80px;
+      backdrop-filter: blur(10px);
+    }
+
+    .morph-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, 
+        rgba(0, 255, 255, 0.0) 0%, 
+        rgba(0, 255, 255, 0.1) 50%, 
+        rgba(255, 0, 255, 0.0) 100%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .morph-btn:hover::before {
+      opacity: 1;
+    }
+
+    .morph-btn:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(0, 255, 255, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 
+        0 8px 32px rgba(0, 255, 255, 0.2),
+        0 0 20px rgba(0, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 1);
+    }
+
+    .morph-btn.active {
+      background: rgba(0, 255, 255, 0.1);
+      border-color: rgba(0, 255, 255, 0.4);
+      color: #ffffff;
+      box-shadow: 
+        0 0 30px rgba(0, 255, 255, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    .morph-btn.active::before {
+      opacity: 0.3;
+    }
+
+    /* 图标样式优化 */
+    .morph-btn .emoji {
+      font-size: 20px;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .morph-btn .title {
+      font-weight: 500;
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+
+    /* 隐藏描述文字（简化设计） */
+    .morph-description {
+      display: none;
+    }
+
+    /* 重新设计的信息面板 */
+    .morph-info-panel {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 16px 20px;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+
+    .morph-info-title {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: rgba(0, 255, 255, 0.9);
+      transition: color 0.3s ease;
+    }
+
+    .morph-info-description {
+      font-size: 11px;
+      line-height: 1.5;
+      opacity: 0.6;
+      margin: 0;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* 重新设计的切换按钮 - 增强反馈 */
+    .toggle-panel {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      z-index: 110;
+      background: rgba(15, 15, 25, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      backdrop-filter: blur(20px);
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 20px rgba(0, 255, 255, 0.1);
+    }
+
+    .toggle-panel:hover {
+      background: rgba(0, 255, 255, 0.1);
+      border-color: rgba(0, 255, 255, 0.3);
+      transform: scale(1.05);
+      box-shadow: 
+        0 12px 40px rgba(0, 255, 255, 0.2),
+        0 0 30px rgba(0, 255, 255, 0.3);
+    }
+
+    .toggle-panel.panel-open {
+      background: rgba(0, 255, 255, 0.2);
+      border-color: rgba(0, 255, 255, 0.5);
+      transform: rotate(180deg);
+      box-shadow: 
+        0 0 40px rgba(0, 255, 255, 0.4),
+        0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .toggle-panel.panel-open:hover {
+      transform: rotate(180deg) scale(1.05);
+      background: rgba(0, 255, 255, 0.25);
+    }
+
+    /* 性能监控 */
+    .performance-stats {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 10px 15px;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 12px;
+      color: #00ff88;
+    }
+
+    /* 加载屏幕 - 重新设计 */
+    .loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(ellipse at center, #001122 0%, #000000 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: opacity 1s ease;
+      overflow: hidden;
+    }
+
+    .loading-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* 粒子LOGO画布容器 */
+    .logo-canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1001;
+    }
+
+    .loading-content {
+      position: relative;
+      z-index: 1002;
+      text-align: center;
+      opacity: 0;
+      animation: fadeInUp 1s ease 2s forwards;
+    }
+
+    .loading-title {
+      font-size: 2.5rem;
+      font-weight: 300;
+      margin-bottom: 1rem;
+      background: linear-gradient(45deg, #00ffff, #ff00ff, #ffff00);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: gradient 3s ease infinite;
+      opacity: 0;
+      transform: translateY(30px);
+      animation-delay: 4s;
+      animation-fill-mode: forwards;
+    }
+
+    .loading-subtitle {
+      font-size: 1rem;
+      opacity: 0;
+      margin-bottom: 2rem;
+      transform: translateY(20px);
+      animation: fadeInUp 1s ease 4.5s forwards;
+    }
+
+    .loading-progress {
+      width: 400px;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      position: relative;
+      overflow: hidden;
+      opacity: 0;
+      animation: fadeInUp 1s ease 5s forwards;
+      overflow: hidden;
+    }
+
+    .loading-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    @keyframes gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* 进度条增强效果 */
+    .loading-bar {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .loading-bar::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      animation: loadingShine 2s ease-in-out infinite;
+    }
+
+    @keyframes loadingShine {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
+
+    /* 现代响应式设计 */
+    @media (max-width: 768px) {
+      .ui-panel {
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        min-width: auto;
+        max-width: none;
+        transform: translateX(0) translateY(150px);
+        padding: 20px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .ui-panel.active {
+        transform: translateX(0) translateY(0);
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .ui-panel h2 {
+        font-size: 14px;
+        margin-bottom: 16px;
+      }
+
+      .morph-buttons {
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 10px;
+      }
+
+      .morph-btn {
+        min-height: 70px;
+        padding: 12px 8px;
+      }
+
+      .morph-btn .emoji {
+        font-size: 18px;
+        margin-bottom: 4px;
+      }
+
+      .morph-btn .title {
+        font-size: 11px;
+      }
+
+      .toggle-panel {
+        bottom: 20px;
+        right: 20px;
+        width: 48px;
+        height: 48px;
+      }
+
+      .performance-stats {
+        top: 20px;
+        right: 20px;
+        font-size: 10px;
+        padding: 8px 12px;
+      }
+
+      .loading-title {
+        font-size: 2rem;
+      }
+
+      .morph-info-panel {
+        padding: 12px 16px;
+      }
+
+      .morph-info-title {
+        font-size: 13px;
+      }
+
+      .morph-info-description {
+        font-size: 10px;
+      }
+    }
+
+    /* 超小屏设备优化 */
+    @media (max-width: 480px) {
+      .ui-panel {
+        bottom: 15px;
+        left: 15px;
+        right: 15px;
+        padding: 16px;
+      }
+
+      .morph-buttons {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+
+      .morph-btn {
+        min-height: 60px;
+        padding: 10px 6px;
+      }
+
+      .morph-btn .emoji {
+        font-size: 16px;
+      }
+
+      .morph-btn .title {
+        font-size: 10px;
+      }
+
+      .toggle-panel {
+        width: 44px;
+        height: 44px;
+      }
+    }
+  </style>
+  <script type="module" crossorigin src="/intelligent-particle-universe/assets/main-Bwaap-LQ.js"></script>
+</head>
+<body>
+  <!-- 加载屏幕 -->
+  <div class="loading-screen" id="loading-screen">
+    <!-- 粒子LOGO画布容器 -->
+    <div class="logo-canvas-container" id="logo-canvas-container"></div>
+    
+    <!-- 加载内容 -->
+    <div class="loading-content">
+      <h1 class="loading-title">智元粒子宇宙</h1>
+      <p class="loading-subtitle">维度跃迁体验正在初始化...</p>
+      <div class="loading-progress">
+        <div class="loading-bar" id="loading-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Canvas容器 -->
+  <div id="canvas-container"></div>
+
+  <!-- UI控制面板 -->
+  <div class="ui-panel" id="ui-panel">
+    <h2>形态变换控制</h2>
+    <div class="morph-buttons">
+      <button class="morph-btn active" data-morph="nebula" data-description="体验星云的涡旋脉动和能量波纹，感受宇宙深处的原始力量与神秘之美">
+        <span class="emoji">🌌</span>
+        <span class="title">抽象星云</span>
+        <span class="morph-description">体验星云的涡旋脉动和能量波纹</span>
+      </button>
+      <button class="morph-btn" data-morph="web3" data-description="探索去中心化网络的数据流动，感受数字世界的连接与自由">
+        <span class="emoji">🔗</span>
+        <span class="title">WEB3网络</span>
+        <span class="morph-description">探索去中心化网络的数据流动</span>
+      </button>
+      <button class="morph-btn" data-morph="biology" data-description="观察DNA双螺旋的生命舞蹈，探索生命密码的奥秘">
+        <span class="emoji">🧬</span>
+        <span class="title">生物DNA</span>
+        <span class="morph-description">观察DNA双螺旋的生命舞蹈</span>
+      </button>
+      <button class="morph-btn" data-morph="computation" data-description="感受量子比特的纠缠波动，体验计算的无限可能">
+        <span class="emoji">⚡</span>
+        <span class="title">量子电路</span>
+        <span class="morph-description">感受量子比特的纠缠波动</span>
+      </button>
+      <button class="morph-btn" data-morph="data" data-description="见证神经网络的信息传播，感受智能的觉醒瞬间">
+        <span class="emoji">🧠</span>
+        <span class="title">数据图谱</span>
+        <span class="morph-description">见证神经网络的信息传播</span>
+      </button>
+    </div>
+    
+    <!-- 形态信息面板 -->
+    <div class="morph-info-panel" id="morph-info-panel">
+      <h3 class="morph-info-title">抽象星云</h3>
+      <p class="morph-info-description">
+        体验星云的涡旋脉动和能量波纹，感受宇宙深处的原始力量与神秘之美。
+      </p>
+    </div>
+  </div>
+
+  <!-- 面板切换按钮 -->
+  <div class="toggle-panel" id="toggle-panel">
+    <span id="toggle-icon" style="font-size: 20px; transition: all 0.3s ease;">☰</span>
+  </div>
+
+  <!-- 性能监控 -->
+  <div class="performance-stats" id="performance-stats">
+    <div>FPS: <span id="fps">0</span></div>
+    <div>粒子数: <span id="particle-count">0</span></div>
+    <div>GPU内存: <span id="gpu-memory">0MB</span></div>
+  </div>
+
+</body>
+</html> 
